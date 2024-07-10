@@ -1,10 +1,9 @@
 package builder
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
-
-	"github.com/tinygo-org/tinygo/goenv"
 )
 
 // runCCompiler invokes a C compiler with the given arguments.
@@ -23,7 +22,12 @@ func runCCompiler(flags ...string) error {
 
 // link invokes a linker with the given name and flags.
 func link(linker string, flags ...string) error {
-	if hasBuiltinTools && (linker == "ld.lld" || linker == "wasm-ld") {
+	// We only support LLD.
+	if linker != "ld.lld" && linker != "wasm-ld" {
+		return fmt.Errorf("unexpected: linker %s should be ld.lld or wasm-ld", linker)
+	}
+
+	if hasBuiltinTools {
 		// Run command with internal linker.
 		cmd := exec.Command(os.Args[0], append([]string{linker}, flags...)...)
 		cmd.Stdout = os.Stdout
@@ -31,14 +35,5 @@ func link(linker string, flags ...string) error {
 		return cmd.Run()
 	}
 
-	// Fall back to external command.
-	if _, ok := commands[linker]; ok {
-		return execCommand(linker, flags...)
-	}
-
-	cmd := exec.Command(linker, flags...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Dir = goenv.Get("TINYGOROOT")
-	return cmd.Run()
+	return execCommand(linker, flags...)
 }
