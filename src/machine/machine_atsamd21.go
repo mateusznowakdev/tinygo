@@ -1861,8 +1861,11 @@ func (f flashBlockDevice) WriteAt(p []byte, off int64) (n int, err error) {
 
 	f.ensureInitComplete()
 
-	address := FlashDataStart() + uintptr(off)
-	padded := f.pad(p)
+	blockOffset := off % f.WriteBlockSize()
+	address := FlashDataStart() + uintptr(off) - uintptr(blockOffset)
+
+	paddedLeft := f.padLeft(p, blockOffset)
+	padded := f.pad(paddedLeft)
 
 	waitWhileFlashBusy()
 
@@ -1946,6 +1949,16 @@ func (f flashBlockDevice) pad(p []byte) []byte {
 
 	padding := bytes.Repeat([]byte{0xff}, int(f.WriteBlockSize()-overflow))
 	return append(p, padding...)
+}
+
+// padLeft data if needed so it starts at the beginning of the block
+func (f flashBlockDevice) padLeft(p []byte, off int64) []byte {
+	if off == 0 {
+		return p
+	}
+
+	padding := bytes.Repeat([]byte{0xff}, int(off))
+	return append(padding, p...)
 }
 
 func (f flashBlockDevice) ensureInitComplete() {
